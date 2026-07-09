@@ -4,3 +4,4 @@ build/*
 AppRun
 joystick
 *.desktop
+*.spec
