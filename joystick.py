@@ -43,13 +43,17 @@ class App:
         pygame.display.set_icon(icon)
 
         self.joystick_image = self.load_image("data/images/joystick.png")
-        self.joystick_w, self.joystick_h = self.joystick_image.get_size()
-        self.display = pygame.display.set_mode((self.joystick_w, self.joystick_h))
-        
+        self.w, self.h = self.joystick_image.get_size()
+
+        self.display = pygame.Surface((self.w, self.h)).convert_alpha()
+        self.screen = pygame.display.set_mode((self.w, self.h), flags=pygame.RESIZABLE)
+
+        self.original_proportion = self.w / self.h
+
         self.clock = pygame.time.Clock()
         self.running = True
 
-        self.light_on = self.load_image("data/images/on.png")
+        self.light_on = self.load_image("data/images/light_on.png")
 
         buttons = ["cross", "circle", "triangle", "square",
                    "down", "right", "up", "left",
@@ -73,6 +77,11 @@ class App:
         
         self.notify = False
         self.first_time_connection = True 
+
+        self.w_scale, self.h_scale = self.w, self.h
+        self.x, self.y = 0, 0
+
+        self.last_w, self.last_h = self.w, self.h
 
     def load_image(self, path):
         return pygame.image.load(get_path(path)).convert_alpha()
@@ -132,6 +141,24 @@ class App:
                 "right_x":      3, 
                 "right_y":      4, 
             }
+
+    def scale_screen(self, w, h):
+        proportion = w / h
+
+        if proportion >= self.original_proportion:
+            # La ventana es más ancha que la proporción original (Pillarbox - barras a los lados)
+            new_height = h
+            new_width = int(h * self.original_proportion)
+        else:
+            # La ventana es más alta que la proporción original (Letterbox - barras arriba/abajo)
+            new_width = w
+            new_height = int(w / self.original_proportion)
+
+        # Centrar el lienzo virtual en la ventana real
+        x = (w - new_width) // 2
+        y = (h - new_height) // 2
+
+        return new_width, new_height, x, y
 
     def run(self):
         
@@ -202,11 +229,22 @@ class App:
 
     def update(self):
         self.clock.tick(30)
+
+        self.w, self.h = self.screen.get_size()
+
+        # Update while resizing
+        if self.last_w != self.w or self.last_h != self.h:
+            self.last_w, self.last_h = self.w, self.h
+            self.w_scale, self.h_scale, self.x, self.y = self.scale_screen(self.w, self.h)
+            self.render()
+
         pygame.display.flip()
     
     def render(self):
+        
         self.display.fill((0,0,0,0))
-
+        self.screen.fill((0,0,0,0))
+        
         self.display.blit(self.joystick_image, (0,0))
 
         if self.joystick != None:
@@ -218,6 +256,11 @@ class App:
 
         self.left_stick.render(self.display)
         self.right_stick.render(self.display)
+
+        display_scaled = pygame.transform.scale(self.display, (self.w_scale, self.h_scale))
+
+        self.screen.blit(display_scaled, (self.x, self.y))
+        
 
 if __name__ == "__main__":
     App().run()
