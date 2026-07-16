@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 
 import pygame, os, sys, math
+from pathlib import Path
+from platformdirs import user_config_dir
 
 os.environ["SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"] = "1"
+os.environ['SDL_VIDEO_CENTERED'] = '1'
+
+def clean_newline(s):
+    return "".join([char for char in s if char not in "\n"])
 
 def get_path(relative_path):
     if getattr(sys, 'frozen', False):
@@ -33,7 +39,7 @@ class Stick:
         surf.blit(self.image, pos)
 
 class App:
-    def __init__(self):
+    def __init__(self, save_path, last_width, last_height):
 
         pygame.init()
         pygame.display.set_mode(flags=pygame.HIDDEN)
@@ -42,13 +48,20 @@ class App:
         icon = self.load_image("data/images/icon.png")
         pygame.display.set_icon(icon)
 
+        self.save_path = save_path
+
         self.joystick_image = self.load_image("data/images/joystick.png")
         self.w, self.h = self.joystick_image.get_size()
 
         self.display = pygame.Surface((self.w, self.h)).convert_alpha()
+
+        if (last_width != None and last_width.isdigit()) and (last_height != None and last_height.isdigit()):
+            self.w = int(last_width)
+            self.h = int(last_height)
+
         self.screen = pygame.display.set_mode((self.w, self.h), flags=pygame.RESIZABLE)
 
-        self.original_proportion = self.w / self.h
+        self.original_proportion = self.w / (self.h if self.h != 0 else 1)
 
         self.clock = pygame.time.Clock()
         self.running = True
@@ -78,10 +91,10 @@ class App:
         self.notify = False
         self.first_time_connection = True 
 
-        self.w_scale, self.h_scale = self.w, self.h
-        self.x, self.y = 0, 0
+        self.w_scale, self.h_scale = self.w , self.h
+        self.last_w, self.last_h = self.w , self.h
 
-        self.last_w, self.last_h = self.w, self.h
+        self.x, self.y = 0, 0
 
     def load_image(self, path):
         return pygame.image.load(get_path(path)).convert_alpha()
@@ -221,8 +234,11 @@ class App:
 
 
                 if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
+                    
+                    with open(self.save_path, 'w') as f:
+                        f.write(str(self.w_scale) + '\n')
+                        f.write(str(self.h_scale) + '\n')
+                    self.running = False
 
             self.update()
             self.render()
@@ -263,4 +279,14 @@ class App:
         
 
 if __name__ == "__main__":
-    App().run()
+    config_dir = Path(user_config_dir("joystick", roaming=True))
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    save_path = config_dir / "save.txt"
+
+    with open(save_path, "+a") as f:
+        f.seek(0)
+        last_width = clean_newline(f.readline())
+        last_height = clean_newline(f.readline())
+        
+    App(save_path, last_width, last_height).run()
